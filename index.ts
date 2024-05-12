@@ -61,4 +61,22 @@ const getTypesFromTables = (
   console.log(JSON.stringify(types, null, 2).replaceAll(/[",]/g, ``));
 };
 
-getTypesFromTables({}, true);
+getTypesFromTables({
+  headerModel: `              internalId INT NOT NULL,
+    controlToShowId INT NOT NULL,
+    parentControlToShowId INT NOT NULL,
+    regionId INT NOT NULL,
+    headTypeId INT NOT NULL,
+    sensorTypeId INT NOT NULL,
+    headerConnectorId INT NOT NULL,
+    combineConnectorId INT NOT NULL,
+    defaultHarnessChoiceId INT NOT NULL,
+    name TEXT,
+    headerWidthMin INT NOT NULL,
+    headerWidthMax INT NOT NULL,
+    sensorMin INT NOT NULL,
+    sensorMax INT NOT NULL,
+    headerYearMin INT NOT NULL,
+    headerYearMax INT NOT NULL,
+    checkedByDefault BOOLEAN`,
+});
