@@ -1,4 +1,5 @@
 import { dbConnect, dbQuery } from "@precisionplanting/node-api/backend";
+import { camelize } from "../lib/index.js";
 
 dbConnect(`configurator`);
 
@@ -269,11 +270,11 @@ const {
 
 const builder = async () => {
   const required = true;
-  const table = `Conversion`;
+  const tableType = `Grain`;
 
   const questionFilters = {
     Corn: {
-      columns: [
+      filterColumns: [
         { name: `regionId`, val: regionId, required },
         { name: `snoutsId`, val: snouts, required },
         { name: `headerConnectorId`, val: header_ExistingConnector, required },
@@ -282,9 +283,16 @@ const builder = async () => {
         { name: `sensor`, val: numSensors },
         { name: `headerYear`, val: header_Year },
       ],
+      joinTables: [
+        "CombineMake",
+        "CombineModel",
+        "HeaderMake",
+        "HeaderModel",
+        "CombineConnector",
+      ],
     },
     Grain: {
-      columns: [
+      filterColumns: [
         { name: `regionId`, val: regionId, required },
         { name: `headerConnectorId`, val: header_ExistingConnector, required },
         { name: `combineConnectorId`, val: combine_Connector, required },
@@ -294,9 +302,10 @@ const builder = async () => {
         { name: `sensor`, val: numSensors },
         { name: `headerYear`, val: header_Year },
       ],
+      joinTables: [`CombineMake`, `CombineModel`, `HeaderMake`, `HeaderModel`],
     },
     Truesight: {
-      columns: [
+      filterColumns: [
         { name: `regionId`, val: regionId, required },
         { name: `snoutId`, val: snouts, required },
         { name: `combineConnectorId`, val: combine_Connector, required },
@@ -305,16 +314,35 @@ const builder = async () => {
       ],
     },
     Conversion: {
-      columns: [
+      filterColumns: [
         { name: `regionId`, val: regionId, required },
         // This may be non-required
         { name: `combineConnectorId`, val: combine_Connector, required },
         { name: `headerYear`, val: header_Year },
       ],
     },
+  }[tableType];
+
+  const joinParts = [
+    { table: `CombineMake`, alias: `cm`, value: combine_Make },
+    { table: `CombineModel`, alias: `cmdl`, value: combine_Model },
+    { table: `HeaderMake`, alias: `hm`, value: header_Make },
+    { table: `HeaderModel`, alias: `hmdl`, value: header_Model },
+    { table: `CombineConnector`, alias: `cc`, value: combine_Connector },
+    { table: `HeaderConnector`, alias: `cc`, value: combine_Connector },
+  ].filter(({ table }) => questionFilters.joinTables.includes(table));
+
+  const { JOINs, joinValues } = {
+    JOINs: joinParts.map(
+      ({ table, alias }) =>
+        `JOIN ${tableType}Question${table} ${alias} ON q.internalId = ${alias}.${tableType.toLowerCase()}QuestionId AND ${alias}.${camelize(table)}Id IN (?)`,
+    ),
+    joinValues: joinParts.flatMap(({ value }) => [
+      [0, ...(value ? [value] : [])],
+    ]),
   };
 
-  const f = questionFilters[table].columns
+  const f = questionFilters.filterColumns
     .filter(({ val, required }) => required || val)
     .map(({ name, val, required }) => {
       return {
@@ -330,22 +358,29 @@ const builder = async () => {
     values: Object.entries(f).flatMap(([, v]) => v.value),
   };
 
+  console.log(joinValues);
+  console.log(values);
+
+  // console.log(
+  // 	`
+  // 	SELECT * FROM ?? q
+  // 	${JOINs.join(` `)}
+  // 	WHERE q.${filters.join(` AND q.`)}
+  // `,
+  // 	[`${tableType}Question`, ...joinValues, ...values]
+  // );
+
   const results = await dbQuery(
     `
 		SELECT * FROM ?? q
+		${JOINs.join(` `)}
 		WHERE q.${filters.join(` AND q.`)}
+		AND q.parentControlToShowId = 0
 	`,
-    [`${table}Questions`, ...values],
+    [`${tableType}Question`, ...joinValues, ...values],
   );
 
-  console.log(
-    `
-		SELECT * FROM ?? q
-		WHERE q.${filters.join(` AND q.`)}
-	`,
-    [`${table}Question`, ...values],
-  );
-  // console.log(results);
+  console.log(results);
 };
 
 // await grainQuestion();
